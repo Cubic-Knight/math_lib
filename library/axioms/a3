@@ -1,0 +1,5 @@
+## Axiom a3
+# Hypotheses
+
+# Assertion
+((¬𝜑 ⇒ ¬𝜓) ⇒ (𝜓 ⇒ 𝜑))

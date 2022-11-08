@@ -1,0 +1,52 @@
+<syntax_def> = "## Syntax Definition (" <def_type> ")\n# Syntax\n" <FORMULA> "\n" <definition>?
+<axiom> = "## Axiom\n" <hypot_list> <assert_list>
+<theorem> = "## Theorem\n" <named_hypot_list> <assert_list> <proof>
+
+<def_type> = "formula" | "setvar"
+<definition> = "# Definition\n" <FORMULA>
+<hypot_list> = ("# Hypothesis\n" | "# Hypotheses\n") (<FORMULA> "\n")*
+<named_hypot_list> ("# Hypothesis\n" | "# Hypotheses\n") (<ASCII_STR> ": " <FORMULA> "\n")*
+<assert_list> = "# Assertion" "s"? "\n" (<FORMULA> "\n")+
+<construction> = "# Construction\n" (<cnstr_line> "\n")+
+<proof> = "# Proof\n" (<proof_line> "\n")+
+
+<cnstr_line> = <line_no> <used_hypots> <syndef_ref> <FORMULA>
+<proof_line> = <line_no> <used_hypots> <theo_or_axiom_ref> <FORMULA>
+
+<line_no> = <UINT>
+<used_hypots> = <UINT> ("," <UINT>)*
+<syndef_ref> = <ASCII_STR>
+<theo_or_axiom_ref> = <ASCII_STR>
+
+
+When compiling, the files are taken into account in this order
+  - syntax definitions (the definitions are also immediately registered as true)
+  - axioms (also considered true), though the compilation will fail if the syntax of an axiom is not recognised as valid by the compiler
+  - theorems, though the compilation will fail if an axiom or a preceding theorem has been misused
+  (all of the syntax definitions, axioms and theorems are ordered within their category, to make sure they do compile in the intended order)
+
+
+Priority Order: ! > + > = > - > 0
+
+! math_lib :: displays information about the current library and some instructions
+- math_lib create <PATH> <NAME> <PASSWORD> :: creates a new math library
+- math_lib profile <NAME> :: select a profile
+! math_lib compile <DIR> :: compiles the directory as a library
+! math_lib add <FILE> :: verifies a theorem and adds it to the library
++ math_lib add_sd <FILE> :: adds a new syntax definition [requires "safe" to be FALSE]
++ math_lib add_ax <FILE> :: adds a new axiom [requires "safe" to be FALSE]
+! math_lib verify <FILE> :: verifies the validity of a theorem
+= math_lib explore [-d | --def | -a | --axiom] [INDEX=0] :: explore the theorems (or other)
+= math_lib edit <FILE> :: edit a pending theorem
+= math_lib flag [FLAG] [VALUE] :: {
+    FLAG=None => lists flags
+    VALUE=None => outputs the value of the selected flag
+    otherwise => sets the selected flag to the chosen value
+}
+! math_lib help [COMMAND] :: helps with the command or lists every command
+
+FLAGS :: {
+  COLOR: bool
+  LIB_PATH: String
+  SAFE: bool
+}

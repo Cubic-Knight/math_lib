@@ -1,0 +1,15 @@
+## Theorem a
+# Hypothesis
+hyp.1: 𝜑
+hyp.2: 𝜓
+hyp.3: (𝜑 ⇒ (𝜓 ⇒ 𝜒))
+
+# Assertion
+𝜒
+
+# Proof
+1;  ;       hyp.1;  𝜑
+2;  ;       hyp.3;  (𝜑 ⇒ (𝜓 ⇒ 𝜒))
+3;  1,2;    mp;     (𝜓 ⇒ 𝜒)
+4;  ;       hyp.2;  𝜓
+5;  4,3;    mp;     𝜒

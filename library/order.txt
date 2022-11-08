@@ -1,0 +1,12 @@
+# Syntax Definitions
+/syntax_definition/im
+/syntax_definition/no
+
+# Axioms
+/axioms/a1
+/axioms/a2
+/axioms/a3
+/axioms/mp
+
+# Theorems
+/theorems/a

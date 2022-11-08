@@ -26,8 +26,8 @@ pub fn parse_file(content: String) -> Result<MathFile, ParseError> {
             ["##", "Syntax", "Definition", "(formula)", name] => {
                 (FileType::FormulaSyntaxDefinition, name.to_owned())
             },
-            ["##", "Syntax", "Definition", "(setvar)", name] => {
-                (FileType::SetVariableSyntaxDefinition, name.to_owned())
+            ["##", "Syntax", "Definition", "(object)", name] => {
+                (FileType::ObjectSyntaxDefinition, name.to_owned())
             },
             ["##", "Axiom", name] => (FileType::Axiom, name.to_owned()),
             ["##", "Theorem", name] => (FileType::Theorem, name.to_owned()),
@@ -117,7 +117,7 @@ pub fn parse_file(content: String) -> Result<MathFile, ParseError> {
                 _ => return Err(ParseError::InvalidSectionOrder)
             };
         },
-        FileType::SetVariableSyntaxDefinition => {
+        FileType::ObjectSyntaxDefinition => {
             match &file_contents[..] {
                 [
                     (FileSection::Syntax, syntax_lines)
@@ -130,7 +130,7 @@ pub fn parse_file(content: String) -> Result<MathFile, ParseError> {
                     return Ok(
                         MathFile::SyntaxDefinition {
                             name,
-                            definition_type: DefinitionType::SetVar,
+                            definition_type: DefinitionType::Object,
                             syntax: parse_formula(syntax_lines[0]),
                             definition: None
                         }
@@ -153,7 +153,7 @@ pub fn parse_file(content: String) -> Result<MathFile, ParseError> {
                     return Ok(
                         MathFile::SyntaxDefinition {
                             name,
-                            definition_type: DefinitionType::SetVar,
+                            definition_type: DefinitionType::Object,
                             syntax: parse_formula(syntax_lines[0]),
                             definition: Some(parse_formula(definition_lines[0]))
                         }

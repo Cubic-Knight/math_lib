@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 use super::{
     Formula, FormulaChar,  // Formula is an alias for 'Vec<FormulaChar>'
     ProofLine  // ProofLine is an alias for '(u32, Vec<u32>, String, Formula)'
@@ -13,11 +12,11 @@ pub fn parse_formula(fm: &str) -> Formula {
         if c == '…' {
             res.push(FormulaChar::RepetitionChar);
         } else if '𝑎' <= c && c <= '𝑧' {  // '𝑎' and '𝑧' here are NOT ascii
-            let id = c as u32 - '𝑎' as u32;
-            res.push(FormulaChar::SetVar(id as u8));
+            let id = c as usize - '𝑎' as usize;
+            res.push(FormulaChar::Object(id));
         } else if '𝛼' <= c && c <= '𝜔' {
-            let id = c as u32 - '𝛼' as u32;
-            res.push(FormulaChar::Wff(id as u8))
+            let id = c as usize - '𝛼' as usize;
+            res.push(FormulaChar::Wff(id))
         } else {
             res.push(FormulaChar::Char(c))
         };
@@ -38,15 +37,14 @@ pub fn parse_named_formula(nfm: &str) -> Result<(String, Formula), ()> {
 pub fn parse_proof_line(prline: &str) -> Result<ProofLine, ()> {
     let mut split = prline.splitn(4, ';');
 
-    let line_no: u32 = match split.next().map(|s| s.trim().parse()) {
-        Some(Ok(line_no)) => line_no,
-        _ => return Err(())
+    let Some(Ok(line_no)) = split.next().map(|s| s.trim().parse::<usize>()) else {
+        return Err(());
     };
-    let used_hypots: Vec<u32> = match split.next() {
+    let used_hypots = match split.next() {
         Some(used_hypots) => {
             let splitted = used_hypots.split(',')
                 .filter(|s| s.trim().len() > 0)
-                .map(|s| s.trim().parse())
+                .map(|s| s.trim().parse::<usize>())
                 .collect();
             match splitted {
                 Ok(vec) => vec,
@@ -55,13 +53,11 @@ pub fn parse_proof_line(prline: &str) -> Result<ProofLine, ()> {
         },
         None => return Err(())
     };
-    let theorem_reference = match split.next() {
-        Some(theorem_reference) => theorem_reference.trim().to_owned(),
-        None => return Err(())
+    let Some(theorem_reference) = split.next().and_then(|s| Some(s.to_string())) else {
+        return Err(());
     };
-    let formula = match split.next() {
-        Some(formula) => parse_formula(formula),
-        None => return Err(())
+    let Some(formula) = split.next().and_then(|fm| Some(parse_formula(fm))) else {
+        return Err(())
     };
     Ok((line_no, used_hypots, theorem_reference, formula))
 }

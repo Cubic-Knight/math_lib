@@ -6,13 +6,13 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub enum FormulaChar {
     Char(char),
-    Wff(u8),
-    SetVar(u8),
+    Wff(usize),
+    Object(usize),
     RepetitionChar
 }
 
 pub type Formula = Vec<FormulaChar>;
-pub type ProofLine = (u32, Vec<u32>, String, Formula);
+pub type ProofLine = (usize, Vec<usize>, String, Formula);
 
 // --------------------------------- //
 // Types for file type determination //
@@ -20,7 +20,7 @@ pub type ProofLine = (u32, Vec<u32>, String, Formula);
 #[derive(Debug)]
 pub enum FileType {
     FormulaSyntaxDefinition,
-    SetVariableSyntaxDefinition,
+    ObjectSyntaxDefinition,
     Axiom,
     Theorem
 }
@@ -42,7 +42,7 @@ pub enum FileSection {
 #[derive(Debug)]
 pub enum DefinitionType {
     Formula,
-    SetVar
+    Object
 }
 
 #[derive(Debug)]

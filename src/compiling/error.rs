@@ -2,15 +2,23 @@ use std::io;
 
 #[derive(Debug)]
 pub enum CompileError {
-    IOError(io::Error, String),
+    // In compiler.rs
     OrderFileNotFound,
-    InvalidOrderLine(String),
+    InvalidOrderLine(String, usize),
+    IOError(io::Error, String, usize),
+    UnparsableFile(String, usize),
+
+    // In math_file.rs
     IncorrectFileType,
-    UnparsableFile(String),
     AmbiguousSyntax(String),
-    IncorrectNumberOfHypothesis(usize, usize, u32),
-    IncorrectResultingFormula(u32),
-    UnknownTheorem(String, u32),
-    AssertionNotProven(u8),
-    UncompilableFormula
+    MissingProofLine(usize),
+    IncorrectNumberOfHypothesis(usize, usize, usize),
+    IncorrectResultingFormula(usize),
+    UnknownTheorem(String, usize),
+    WeirdReference,
+    AssertionNotProven(usize),
+    InaccessibleHypothesis(usize),
+
+    // TODO error
+    ToBeWrittenToFile
 }

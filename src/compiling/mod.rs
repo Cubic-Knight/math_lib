@@ -3,9 +3,10 @@ pub use compiler::compile;
 
 mod types;
 use types::{
-    Placeholder, Syntax, SyntaxType,
-    WellFormedFormula, Definition, Axiom,
-    LogicStep, Reference, Theorem
+    Syntax, SyntaxType, Placeholder,
+    WellFormedFormula, Object,
+    Definition, Axiom, Theorem,
+    LogicStep, Reference
 };
 
 mod math_file;
@@ -20,7 +21,10 @@ mod formula;
 use formula::compile_formula;
 
 mod verification;
-use verification::{formula_is_contained};
+use verification::{
+    formula_is_contained,
+    formula_is_substitution
+};
 
 mod error;
 pub use error::CompileError;

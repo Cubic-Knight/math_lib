@@ -1,11 +1,11 @@
-use super::Placeholder;
+use super::{Placeholder, WellFormedFormula};
 
 
 fn equal_placeholders(p1: &Placeholder, p2: &Placeholder) -> bool {
     match (p1, p2) {
         (Placeholder::LiteralChar(c1), Placeholder::LiteralChar(c2)) => c1 == c2,
         (Placeholder::WellFormedFormula(_), Placeholder::WellFormedFormula(_)) => true,
-        (Placeholder::SetVariable(_), Placeholder::SetVariable(_)) => true,
+        (Placeholder::Object(_), Placeholder::Object(_)) => true,
         (Placeholder::Repetition, Placeholder::Repetition) => true,
         _ => false
     }
@@ -25,4 +25,12 @@ pub fn formula_is_contained(formula1: &Vec<Placeholder>, formula2: &Vec<Placehol
         }
     };
     return false;
+}
+
+pub fn formula_is_substitution(
+    formula: &WellFormedFormula, used_hypotheses: &Vec<WellFormedFormula>,
+    theo_hypotheses: &Vec<WellFormedFormula>, theo_assertion: &WellFormedFormula,
+    wff_count: usize, object_count: usize
+) -> bool {
+    todo!()
 }

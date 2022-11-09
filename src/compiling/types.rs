@@ -1,53 +1,66 @@
 pub enum Placeholder {
     LiteralChar(char),
-    WellFormedFormula(u8),
-    SetVariable(u8),
+    WellFormedFormula(usize),
+    Object(usize),
     Repetition
 }
 
 pub enum SyntaxType {
     Formula,
-    SetVariable
+    Object
 }
 
 pub struct Syntax {
     pub syntax_type: SyntaxType,
     pub formula: Vec<Placeholder>,
-    pub distinct_wff_count: u8,
-    pub distinct_setvar_count: u8
+    pub distinct_wff_count: usize,
+    pub distinct_object_count: usize
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WellFormedFormula {
-    AtomicWff(u8),
-    AtomicSetvar(u8),
+    Atomic(usize),
     SyntaxComposite {
-        syntax_ref: u32,
+        syntax_ref: usize,
         wff_parameters: Vec<WellFormedFormula>,
-        setvar_parameters: Vec<WellFormedFormula>
+        object_parameters: Vec<Object>
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Object {
+    Atomic(usize),
+    SyntaxComposite {
+        syntax_ref: usize,
+        wff_parameters: Vec<WellFormedFormula>,
+        object_parameters: Vec<Object>
     }
 }
 
 pub struct Definition {
     pub name: String,
-    pub definition: WellFormedFormula
+    pub definition: WellFormedFormula,
+    pub distinct_wff_count: usize,
+    pub distinct_object_count: usize
 }
 
 pub struct Axiom {
     pub name: String,
     pub hypotheses: Vec<WellFormedFormula>,
-    pub assertions: Vec<WellFormedFormula>
+    pub assertions: Vec<WellFormedFormula>,
+    pub distinct_wff_count: usize,
+    pub distinct_object_count: usize
 }
 
 pub enum Reference {
-    HypothesisReference(u8),
-    DefinitionReference(u32),
-    AxiomReference(u32, u8),
-    TheoremReference(u32, u8)
+    HypothesisReference(usize),
+    DefinitionReference(usize),
+    AxiomReference(usize, usize),
+    TheoremReference(usize, usize)
 }
 
 pub struct LogicStep {
-    pub used_hypotheses: Vec<u32>,
+    pub used_hypotheses: Vec<usize>,
     pub theorem_ref: Reference,
     pub resulting_formula: WellFormedFormula
 }
@@ -56,5 +69,7 @@ pub struct Theorem {
     pub name: String,
     pub hypotheses: Vec<WellFormedFormula>,
     pub assertions: Vec<WellFormedFormula>,
-    pub proof: Vec<LogicStep>
+    pub proof: Vec<LogicStep>,
+    pub distinct_wff_count: usize,
+    pub distinct_object_count: usize
 }

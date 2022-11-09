@@ -1,15 +1,17 @@
 use crate::parsing::FormulaChar;
 use super::{
     Placeholder,
-    Syntax, WellFormedFormula,
+    Syntax, WellFormedFormula, Object,
     CompileError
 };
 
 enum PartiallyCompiled {
     NotCompiled(FormulaChar),
-    Compiled(WellFormedFormula)
+    CompiledFormula(WellFormedFormula),
+    CompiledObject(Object)
 }
 
+/*
 fn are_comparable(partcomp: &PartiallyCompiled, placeholder: &Placeholder) -> bool {
     match (partcomp, placeholder) {
         (
@@ -21,14 +23,23 @@ fn are_comparable(partcomp: &PartiallyCompiled, placeholder: &Placeholder) -> bo
             Placeholder::WellFormedFormula(_)
         ) => true,
         (
-            PartiallyCompiled::Compiled(WellFormedFormula::AtomicSetvar(_)),
-            Placeholder::SetVariable(_)
+            PartiallyCompiled::Compiled(WellFormedFormula::AtomicObject(_)),
+            Placeholder::Object(_)
         ) => true,
         _ => false
     }
 }
+ */
 
-pub fn compile_formula(formula: Vec<FormulaChar>, syntaxes: &Vec<Syntax>)
+pub fn compile_formula(
+    formula: Vec<FormulaChar>, syntaxes: &Vec<Syntax>,
+    wffs: &mut Vec<WellFormedFormula>, objects: &mut Vec<Object>
+) -> Result<WellFormedFormula, CompileError> {
+    todo!()
+}
+
+/*
+pub fn compile_formula_OLD(formula: Vec<FormulaChar>, syntaxes: &Vec<Syntax>)
 -> Result<WellFormedFormula, CompileError>
 {
     let mut partial_compilation = formula.into_iter()
@@ -89,3 +100,4 @@ pub fn compile_formula(formula: Vec<FormulaChar>, syntaxes: &Vec<Syntax>)
         _ => Err(CompileError::UncompilableFormula)
     }
 }
+ */

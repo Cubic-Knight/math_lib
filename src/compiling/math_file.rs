@@ -80,8 +80,8 @@ pub fn compile_syntax(file: MathFile, syntaxes: &Vec<Syntax>)
 }
 
 pub fn compile_definition(name: String, def: Vec<FormulaChar>, syntaxes: &Vec<Syntax>) -> Result<Definition, CompileError> {
-    let mut wffs = Vec::<WellFormedFormula>::new();
-    let mut objects = Vec::<Object>::new();
+    let mut wffs = HashMap::<usize, WellFormedFormula>::new();
+    let mut objects = HashMap::<usize, Object>::new();
     let definition = compile_formula(def, syntaxes, &mut wffs, &mut objects)?;
     Ok(
         Definition {
@@ -94,8 +94,8 @@ pub fn compile_definition(name: String, def: Vec<FormulaChar>, syntaxes: &Vec<Sy
 }
 
 pub fn compile_axiom(file: MathFile, syntaxes: &Vec<Syntax>) -> Result<Axiom, CompileError> {
-    let mut wffs = Vec::<WellFormedFormula>::new();
-    let mut objects = Vec::<Object>::new();
+    let mut wffs = HashMap::<usize, WellFormedFormula>::new();
+    let mut objects = HashMap::<usize, Object>::new();
     let (name, hypotheses, assertions) = match file {
         MathFile::Axiom {
             name,
@@ -127,8 +127,8 @@ pub fn compile_theorem(
     theorems: &Vec<Theorem>,
     references: &HashMap<String, Reference> 
 ) -> Result<Theorem, CompileError> {
-    let mut wffs = Vec::<WellFormedFormula>::new();
-    let mut objects = Vec::<Object>::new();
+    let mut wffs = HashMap::<usize, WellFormedFormula>::new();
+    let mut objects = HashMap::<usize, Object>::new();
     let (name, hypotheses, assertions, proof) = match file {
         MathFile::Theorem {
             name,
@@ -239,11 +239,12 @@ pub fn compile_theorem(
         if used_hypots.len() != theo_hypotheses.len() {
             return Err(CompileError::IncorrectNumberOfHypothesis(used_hypots.len(), theo_hypotheses.len(), index));
         };
-        let Some(used_hypotheses) = used_hypots.iter()
-            .map(|idx| compiled_proof.get(*idx).map(|st| st.resulting_formula.clone()))
-            .collect::<Option<Vec<_>>>() else {
-                return Err(CompileError::InaccessibleHypothesis(index));
-            };
+        let used_hypotheses = used_hypots.iter()
+            .map(|hyp_id| hyp_id.checked_sub(1)
+                .ok_or(CompileError::InaccessibleHypothesis(0, index))
+                .and_then(|idx| compiled_proof.get(idx).ok_or(CompileError::InaccessibleHypothesis(idx+1, index)))
+                .map(|step| step.resulting_formula.clone())
+            ).collect::<Result<Vec<_>, _>>()?;
         let resulting_formula = compile_formula(formula, syntaxes, &mut wffs, &mut objects)?;
         if !formula_is_substitution(&resulting_formula, &used_hypotheses, &theo_hypotheses, &theo_assertion, wff_count, object_count) {
             return Err(CompileError::IncorrectResultingFormula(index));

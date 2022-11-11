@@ -53,7 +53,7 @@ pub fn parse_proof_line(prline: &str) -> Result<ProofLine, ()> {
         },
         None => return Err(())
     };
-    let Some(theorem_reference) = split.next().and_then(|s| Some(s.to_string())) else {
+    let Some(theorem_reference) = split.next().and_then(|s| Some(s.trim().to_string())) else {
         return Err(());
     };
     let Some(formula) = split.next().and_then(|fm| Some(parse_formula(fm))) else {

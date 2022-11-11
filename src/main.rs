@@ -1,6 +1,8 @@
+#[allow(unused)]
 use std::fs;
 
 mod parsing;
+#[allow(unused)]
 use parsing::parse_file;
 
 mod compiling;

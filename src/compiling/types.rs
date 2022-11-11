@@ -73,3 +73,11 @@ pub struct Theorem {
     pub distinct_wff_count: usize,
     pub distinct_object_count: usize
 }
+
+use crate::parsing::FormulaChar;
+#[derive(Debug)]
+pub enum PartiallyCompiled {
+    NotCompiled(FormulaChar),
+    CompiledFormula(WellFormedFormula),
+    CompiledObject(Object)
+}

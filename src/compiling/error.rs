@@ -1,4 +1,5 @@
 use std::io;
+use super::PartiallyCompiled;
 
 #[derive(Debug)]
 pub enum CompileError {
@@ -16,9 +17,14 @@ pub enum CompileError {
     IncorrectResultingFormula(usize),
     UnknownTheorem(String, usize),
     WeirdReference,
+    InaccessibleHypothesis(usize, usize),
     AssertionNotProven(usize),
-    InaccessibleHypothesis(usize),
+
+    // In formula.rs
+    ShouldNotBeReached,
+    UncompilableFormula(Vec<PartiallyCompiled>),
 
     // TODO error
+    RepetitionCharacterNotCompilable,
     ToBeWrittenToFile
 }

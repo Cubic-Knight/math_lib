@@ -6,7 +6,8 @@ use types::{
     Syntax, SyntaxType, Placeholder,
     WellFormedFormula, Object,
     Definition, Axiom, Theorem,
-    LogicStep, Reference
+    LogicStep, Reference,
+    PartiallyCompiled
 };
 
 mod math_file;

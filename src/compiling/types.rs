@@ -52,6 +52,7 @@ pub struct Axiom {
     pub distinct_object_count: usize
 }
 
+#[derive(Debug)]
 pub enum Reference {
     HypothesisReference(usize),
     DefinitionReference(usize),
@@ -59,12 +60,14 @@ pub enum Reference {
     TheoremReference(usize, usize)
 }
 
+#[derive(Debug)]
 pub struct LogicStep {
     pub used_hypotheses: Vec<usize>,
     pub theorem_ref: Reference,
     pub resulting_formula: WellFormedFormula
 }
 
+#[derive(Debug)]
 pub struct Theorem {
     pub name: String,
     pub hypotheses: Vec<WellFormedFormula>,

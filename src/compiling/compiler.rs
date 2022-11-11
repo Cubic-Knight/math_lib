@@ -86,5 +86,6 @@ pub fn compile(mut dir: String) -> Result<(), CompileError> {
             }
         };
     };
+    println!("{:#?}", theorems);
     Err(CompileError::ToBeWrittenToFile)
 }

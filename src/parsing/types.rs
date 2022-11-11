@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 // --------------------------------------------- //
 // Types for mathematical formula representation //
 // --------------------------------------------- //
@@ -60,7 +58,7 @@ pub enum MathFile {
     },
     Theorem {
         name: String,
-        hypotheses: HashMap<String, Formula>,
+        hypotheses: Vec<(String, Formula)>,
         assertions: Vec<Formula>,
         proof: Vec<ProofLine>
     }

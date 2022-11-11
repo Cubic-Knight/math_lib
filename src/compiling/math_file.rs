@@ -239,10 +239,12 @@ pub fn compile_theorem(
         if used_hypots.len() != theo_hypotheses.len() {
             return Err(CompileError::IncorrectNumberOfHypothesis(used_hypots.len(), theo_hypotheses.len(), index));
         };
+        let used_hypots = used_hypots.into_iter()
+            .map(|n| n.checked_sub(1).ok_or(CompileError::InaccessibleHypothesis(0, index)))
+            .collect::<Result<Vec<_>, _>>()?;
         let used_hypotheses = used_hypots.iter()
-            .map(|hyp_id| hyp_id.checked_sub(1)
-                .ok_or(CompileError::InaccessibleHypothesis(0, index))
-                .and_then(|idx| compiled_proof.get(idx).ok_or(CompileError::InaccessibleHypothesis(idx+1, index)))
+            .map(|idx| compiled_proof.get(*idx)
+                .ok_or(CompileError::InaccessibleHypothesis(idx+1, index))
                 .map(|step| step.resulting_formula.clone())
             ).collect::<Result<Vec<_>, _>>()?;
         let resulting_formula = compile_formula(formula, syntaxes, &mut wffs, &mut objects)?;

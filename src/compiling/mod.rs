@@ -2,7 +2,7 @@ mod compiler;
 pub use compiler::compile;
 
 mod types;
-use types::{
+pub use types::{
     Syntax, SyntaxType, Placeholder,
     WellFormedFormula, Object,
     Definition, Axiom, Theorem,

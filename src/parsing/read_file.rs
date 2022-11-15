@@ -9,8 +9,6 @@ pub enum ParseError {
     InvalidHeader(String),
     EmptyFile,
     InvalidSection(String, FileType),
-    FileWithoutSection,
-    UncorrelatedSection(FileSection, FileType),
     MultilineSection(FileSection),
     EmptySection(FileSection),
     InvalidSectionOrder,
@@ -209,6 +207,4 @@ pub fn parse_file(content: String) -> Result<MathFile, ParseError> {
             }
         }
     };
-
-    Err(ParseError::EmptyFile)
 }

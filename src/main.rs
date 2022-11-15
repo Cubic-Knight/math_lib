@@ -9,6 +9,8 @@ mod compiling;
 #[allow(unused)]
 use compiling::compile;
 
+mod serializing;
+
 fn main() {
     /*
     let content = fs::read_to_string("library/theorems/a").unwrap();

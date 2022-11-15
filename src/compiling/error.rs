@@ -26,5 +26,4 @@ pub enum CompileError {
 
     // TODO error
     RepetitionCharacterNotCompilable,
-    ToBeWrittenToFile
 }

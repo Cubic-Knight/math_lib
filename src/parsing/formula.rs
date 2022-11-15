@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{
     Formula, FormulaChar,  // Formula is an alias for 'Vec<FormulaChar>'
     ProofLine  // ProofLine is an alias for '(u32, Vec<u32>, String, Formula)'

@@ -1,5 +1,6 @@
 use std::{fs, io, collections::HashMap};
 use crate::parsing::parse_file;
+use crate::serializing::write_lib;
 use super::{
     Reference,
     compile_syntax, compile_definition, compile_axiom, compile_theorem,
@@ -86,6 +87,8 @@ pub fn compile(mut dir: String) -> Result<(), CompileError> {
             }
         };
     };
-    println!("{:#?}", theorems);
-    Err(CompileError::ToBeWrittenToFile)
+    match write_lib(dir + "/library.math", syntaxes, definitions, axioms, theorems) {
+        Ok(()) => Ok(()),
+        Err(e) => Err(CompileError::IOError(e, "At writing step".to_string(), 0))
+    }
 }

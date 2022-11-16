@@ -7,7 +7,8 @@ pub use types::{
     WellFormedFormula, Object,
     Definition, Axiom, Theorem,
     LogicStep, Reference,
-    PartiallyCompiled
+    PartiallyCompiled,
+    Library
 };
 
 mod math_file;

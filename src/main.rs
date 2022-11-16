@@ -10,18 +10,16 @@ mod compiling;
 use compiling::compile;
 
 mod serializing;
+use serializing::read_file;
 
 fn main() {
-    /*
-    let content = fs::read_to_string("library/theorems/a").unwrap();
-    let math_file = parse_file(content);
-    match math_file {
-        Ok(math_file) => println!("{:?}", math_file),
-        Err(e) => println!("{:?}", e)
-    }
-     */
-    match compile("library".to_string()) {
+    let dir = "library".to_string();
+    match compile(dir.clone()) {
         Ok(()) => println!("Compilation successful"),
         Err(e) => println!("{e:?}")
     };
+    match read_file(dir + "/library.math") {
+        Ok(lib) => println!("{lib:#?}"),
+        Err(e) => println!("{e:?}")
+    }
 }

@@ -119,8 +119,8 @@ impl Vectorizable for Reference {
             bytes[i] = data
         };
         let num = u64::from_le_bytes(bytes);
-        let id = (num >> 32) as usize;
-        let sub_id = (num & 0xFF_FF_FF_FF) as usize;
+        let id = (num & 0xFF_FF_FF_FF) as usize;
+        let sub_id = (num >> 32) as usize;
         let res = match first_byte {
             0x00 => Reference::HypothesisReference(id),
             0x01 => Reference::DefinitionReference(id),

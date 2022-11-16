@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Placeholder {
     LiteralChar(char),
     WellFormedFormula(usize),
@@ -5,11 +6,13 @@ pub enum Placeholder {
     Repetition
 }
 
+#[derive(Debug)]
 pub enum SyntaxType {
     Formula,
     Object
 }
 
+#[derive(Debug)]
 pub struct Syntax {
     pub syntax_type: SyntaxType,
     pub formula: Vec<Placeholder>,
@@ -37,6 +40,7 @@ pub enum Object {
     }
 }
 
+#[derive(Debug)]
 pub struct Definition {
     pub name: String,
     pub definition: WellFormedFormula,
@@ -44,6 +48,7 @@ pub struct Definition {
     pub distinct_object_count: usize
 }
 
+#[derive(Debug)]
 pub struct Axiom {
     pub name: String,
     pub hypotheses: Vec<WellFormedFormula>,
@@ -83,4 +88,12 @@ pub enum PartiallyCompiled {
     NotCompiled(FormulaChar),
     CompiledFormula(WellFormedFormula),
     CompiledObject(Object)
+}
+
+#[derive(Debug)]
+pub struct Library {
+    pub syntaxes: Vec<Syntax>,
+    pub definitions: Vec<Definition>,
+    pub axioms: Vec<Axiom>,
+    pub theorems: Vec<Theorem>
 }

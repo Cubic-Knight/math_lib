@@ -1,5 +1,7 @@
 mod read_write;
-pub use read_write::write_lib;
+pub use read_write::{
+    read_file, write_lib
+};
 
 mod rpn;
 use rpn::{

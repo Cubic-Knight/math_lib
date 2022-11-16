@@ -5,6 +5,7 @@ use super::{
     Reference,
     compile_syntax, compile_definition, compile_axiom, compile_theorem,
     CompileError,
+    Library
 };
 
 fn get_file_contents(dir: &mut String, filepath: &str) -> io::Result<String> {
@@ -87,7 +88,13 @@ pub fn compile(mut dir: String) -> Result<(), CompileError> {
             }
         };
     };
-    match write_lib(dir + "/library.math", syntaxes, definitions, axioms, theorems) {
+    let lib = Library {
+        syntaxes,
+        definitions,
+        axioms,
+        theorems
+    };
+    match write_lib(dir + "/library.math", lib) {
         Ok(()) => Ok(()),
         Err(e) => Err(CompileError::IOError(e, "At writing step".to_string(), 0))
     }

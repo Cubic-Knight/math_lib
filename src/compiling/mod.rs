@@ -1,5 +1,11 @@
 mod compiler;
-pub use compiler::compile;
+pub use compiler::{
+    add_syndef_to_lib,
+    add_axiom_to_lib,
+    add_theo_to_lib,
+    verify_theo,
+    compile_directory
+};
 
 mod types;
 pub use types::{

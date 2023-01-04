@@ -1,6 +1,6 @@
 # Syntax Definitions
-/syntax_definition/im
-/syntax_definition/no
+/syntax_definitions/im
+/syntax_definitions/no
 
 # Axioms
 /axioms/a1

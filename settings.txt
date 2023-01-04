@@ -1,0 +1,3 @@
+COLOR=true
+LIB_PATH="library"
+SAFE=true

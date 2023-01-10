@@ -4,20 +4,25 @@ use super::{
     FileGraphics
 };
 use crate::parsing::{
-    FileLine, ProvenState,
-    ColoredString, Color
+    FileLine, ColorInfo
 };
 
-const LINE_TERMINATOR: &'static str = "\x1b[m\n\r";
+const LINE_TERMINATOR: &'static str = "\x1b[m\r\n";
 
-pub fn display_menu(menu: &MenuGraphics) {
-    let MenuGraphics { cursor, lines } = menu;
+pub fn display_menu(menu: &MenuGraphics, dimensions: &(usize, usize)) {
+    let MenuGraphics { cursor, camera, lines } = menu;
 
     print!("\x1b[2J\x1b[H"); // Clear display
-    for (index, line) in lines.into_iter().enumerate() {
+    let start = camera.saturating_sub(1);
+    let end = start + dimensions.1.saturating_sub(2);
+    for index in start..end {
+        let line = match lines.get(index) {
+            Some(line) => line,
+            None => break
+        };
         let (indent, color, name) = match line {
             MenuLine::RootDirectory(name) => {
-                ("", "\x1b[1;4;33m", name)
+                ("", "\x1b[1;4;33m", name.to_owned())
             },
             MenuLine::SubDirectory(name, is_last) => {
                 let indent = match is_last {
@@ -28,6 +33,9 @@ pub fn display_menu(menu: &MenuGraphics) {
                     true => "\x1b[1;7;34m",
                     false => "\x1b[1;34m"
                 };
+                let name = name.chars()
+                    .take(dimensions.0.saturating_sub(5))
+                    .collect::<String>();
                 (indent, color, name)
             },
             MenuLine::File(name, _, is_in_last_dir, is_last_in_dir) => {
@@ -41,6 +49,9 @@ pub fn display_menu(menu: &MenuGraphics) {
                     true => "\x1b[7m",
                     false => "\x1b[m"
                 };
+                let name = name.chars()
+                    .take(dimensions.0.saturating_sub(9))
+                    .collect::<String>();
                 (indent, color, name)
             },
         };
@@ -49,106 +60,59 @@ pub fn display_menu(menu: &MenuGraphics) {
     stdout().flush().unwrap();
 }
 
-
-fn colored_string_display(string: &ColoredString) -> String {
-    let ColoredString { characters, colors } = string;
-    let mut result_string = String::new();
-    let mut current_color = Color::Normal;
-    for (chr, col) in characters.into_iter().zip(colors) {
-        if *col != current_color {
-            result_string.push_str( &format!("\x1b[{}m", *col as u8) );
-            current_color = *col;
-        };
-        result_string.push(*chr);
-    };
-    result_string
-}
-
-pub fn display_file(file: &FileGraphics) {
+pub fn display_file(file: &FileGraphics, dimensions: &(usize, usize), indent: usize) {
     let FileGraphics {
-        cursor: _,
+        cursor, camera,
         lines,
-        indent_info,
         read_only: _
     } = file;
 
+    let mut to_print = String::new();
+    let mut line_count = 0;
+    for (lno, line) in lines.iter().enumerate().skip(camera.saturating_sub(1)) {
+        if line_count >= dimensions.1.saturating_sub(1) {
+            break;
+        };
+        let FileLine { context: _, chars, colors } = line;
+        let indexed_chars_and_colors = chars.into_iter()
+            .chain(Some(&' '))
+            .zip( colors.into_iter().chain( Some(&ColorInfo::NO_COLOR) ) )
+            .enumerate();
+
+        let mut current_string = String::new();
+        let mut char_count = 0;
+        let mut current_color = ColorInfo::NO_COLOR;
+        for (cno, (ch, col)) in indexed_chars_and_colors {
+            if char_count >= dimensions.0.saturating_sub(1) {
+                to_print.push_str(&current_string);
+                to_print.push_str(LINE_TERMINATOR);
+                current_string = " ".repeat(indent);
+                char_count = indent;
+                line_count += 1;
+            };
+            if col != &current_color {
+                current_color = *col;
+                current_string.push_str(&col.to_escape_string());
+                // "\x1b[{col}G" is to force cursor to stay in the correct column
+                // There should not be a need for that escape sequence
+                //  but there is a bug with chars that are above U+FFFF
+                current_string.push_str( &format!("\x1b[{}G", char_count+1) );
+            };
+            if (lno+1, cno+1) == *cursor { current_string.push_str("\x1b[7m"); };
+            current_string.push(*ch);
+            if (lno+1, cno+1) == *cursor {
+                current_string.push_str("\x1b[m");
+                current_color = ColorInfo::NO_COLOR;
+            };
+            char_count += 1;
+        };
+        to_print.push_str(&current_string);
+        to_print.push_str(LINE_TERMINATOR);
+        line_count += 1;
+    }
+
     print!("\x1b[2J\x1b[H"); // Clear display
-    for line in lines {
-        match line {
-            FileLine::Raw(text) => print!("{text}{}", LINE_TERMINATOR),
-            FileLine::Title {
-                title, name, title_good, name_good
-            } => {
-                let title_color = match title_good {
-                    true => "\x1b[30;44m",
-                    false => "\x1b[30;41m"
-                };
-                let name_color = match name_good {
-                    // name_color could be dependant of the state of the theorem
-                    // bad name => red
-                    // missing critical parts => grey
-                    // incomplete => yellow
-                    // valid => green
-                    true => "\x1b[30;46m",
-                    false => "\x1b[30;41m"
-                };
-                print!("{title_color}{title} {name_color}{name}{}", LINE_TERMINATOR);
-            },
-            FileLine::Section { name, is_valid } => {
-                let color = match is_valid {
-                    true => "",
-                    false => ""
-                };
-                print!("{color}{name}{}", LINE_TERMINATOR);
-            },
-            FileLine::Hypothesis { name, hypot } => {
-                let line_display = colored_string_display(hypot);
-                print!("{name}: {line_display}{}", LINE_TERMINATOR);
-            },
-            FileLine::Assertion { assertion, is_proven } => {
-                let color = match is_proven {
-                    ProvenState::NotProven => "",
-                    ProvenState::Proven => "",
-                    ProvenState::Assumed => "",
-                    ProvenState::None => ""
-                };
-                let line_display = colored_string_display(assertion);
-                print!("{color}{line_display}{}", LINE_TERMINATOR);
-            },
-            FileLine::ProofLine {
-                line_no, line_index, used_hypots,
-                theo_ref, theo_ref_exists, formula
-            } => {
-                let line_no_color = match line_no.parse::<usize>() == Ok(*line_index) {
-                    true => "",
-                    false => ""
-                };
-                let line_no_indent = " ".repeat(indent_info.line_number_indent - line_no.len());
-
-                let used_hypots_display = used_hypots.join(", ");
-                let used_hypots_indent = " ".repeat(
-                    indent_info.used_hypotheses_indent - used_hypots_display.len()
-                );
-
-                let theo_ref_color = match theo_ref_exists {
-                    true => "",
-                    false => ""
-                };
-                let theo_ref_indent = " ".repeat(
-                    indent_info.theorem_reference_indent - theo_ref.len()
-                );
-
-                let formula_display = colored_string_display(formula);
-                print!(
-                    "{line_no_color}{line_no}{line_no_indent}; \
-                     {used_hypots_display}{used_hypots_indent}; \
-                     {theo_ref_color}{theo_ref}{theo_ref_indent}; \
-                     {formula_display}{}",
-                    LINE_TERMINATOR
-                )
-            },
-            FileLine::UnexpectedLine(text) => print!("\x1b[31m{text}{}", LINE_TERMINATOR)
-        }
-    };
+    print!("{}", to_print);
+    print!("\x1b[{};{}H", cursor.0, cursor.1);
     stdout().flush().unwrap();
 }

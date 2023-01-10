@@ -1,8 +1,8 @@
 mod types;
 use types::FileType;
 pub use types::{
-    FileLine, ProvenState,
-    ColoredString, Color
+    FileLine, LineContext,
+    ColorInfo, Color
 };
 
 mod parser;

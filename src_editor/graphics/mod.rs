@@ -11,6 +11,5 @@ pub use menu::{
 
 mod file;
 pub use file::{
-    get_file, FileGraphics,
-    IndentInfo
+    get_file, FileGraphics
 };

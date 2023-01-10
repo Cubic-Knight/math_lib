@@ -1,36 +1,47 @@
 use std::collections::HashMap;
-use super::{ColoredString, Color};
+use super::{
+    FileLine, LineContext,
+    ColorInfo, Color
+};
 use crate::library_data::{
     Syntax, SyntaxType,
     Placeholder,
     LibraryData
 };
 
-pub fn parse_new_syntax(line: &str, syntax_type: SyntaxType) -> (ColoredString, Option<Syntax>) {
+const WFF_VAR_COLOR: ColorInfo = ColorInfo::fg_color(Color::Blue).bold();
+const WFF_SINGLETON_COLOR: ColorInfo = ColorInfo::fg_color(Color::Green);
+const WFF_SYNTAX_COLOR: ColorInfo = ColorInfo::fg_color(Color::Cyan);
+const OBJ_VAR_COLOR: ColorInfo = ColorInfo::fg_color(Color::Red).bold();
+const OBJ_SINGLETON_COLOR: ColorInfo = ColorInfo::fg_color(Color::Yellow);
+const OBJ_SYNTAX_COLOR: ColorInfo = ColorInfo::fg_color(Color::Magenta);
+const NEW_SYNTAX_COLOR: ColorInfo = ColorInfo::fg_color(Color::White);
+
+pub fn parse_new_syntax(line: &str, syntax_type: SyntaxType) -> (FileLine, Option<Syntax>) {
     if line.len() == 0 {
         return (
-            ColoredString { characters: vec![], colors: vec![] },
+            FileLine { context: LineContext::SyntaxDefinition, chars: vec![], colors: vec![] },
             None
         );
     };
-    let mut characters = Vec::new();
+    let mut chars = Vec::new();
     let mut colors = Vec::new();
     let mut formula = Vec::new();
     let mut wff_mapping = HashMap::new();
     let mut obj_mapping = HashMap::new();
     for c in line.chars() {
         if c == ' ' {
-            characters.push(c);
-            colors.push(Color::Normal);
+            chars.push(c);
+            colors.push(ColorInfo::NO_COLOR);
             continue;
         };
         if c == '…' {
-            characters.push(c);
-            colors.push(Color::Black);
+            chars.push(c);
+            colors.push(ColorInfo::fg_color(Color::Black));
             formula.push(Placeholder::Repetition);
         } else if '𝑎' <= c && c <= '𝑧' {  // '𝑎' and '𝑧' here are NOT ascii
-            characters.push(c);
-            colors.push(Color::Red);
+            chars.push(c);
+            colors.push(OBJ_VAR_COLOR);
             match wff_mapping.get(&c) {
                 Some(id) => formula.push(Placeholder::WellFormedFormula(*id)),
                 None => {
@@ -39,8 +50,8 @@ pub fn parse_new_syntax(line: &str, syntax_type: SyntaxType) -> (ColoredString, 
                 }
             };
         } else if '𝛼' <= c && c <= '𝜔' {
-            characters.push(c);
-            colors.push(Color::Blue);
+            chars.push(c);
+            colors.push(WFF_VAR_COLOR);
             match obj_mapping.get(&c) {
                 Some(id) => formula.push(Placeholder::Object(*id)),
                 None => {
@@ -49,8 +60,8 @@ pub fn parse_new_syntax(line: &str, syntax_type: SyntaxType) -> (ColoredString, 
                 }
             };
         } else {
-            characters.push(c);
-            colors.push(Color::White);
+            chars.push(c);
+            colors.push(NEW_SYNTAX_COLOR);
             formula.push(Placeholder::LiteralChar(c))
         };
     };
@@ -60,27 +71,29 @@ pub fn parse_new_syntax(line: &str, syntax_type: SyntaxType) -> (ColoredString, 
         distinct_wff_count: wff_mapping.len(),
         distinct_object_count: obj_mapping.len()
     };
-    (ColoredString { characters, colors }, Some(syntax))
+    (FileLine { context: LineContext::SyntaxDefinition, chars, colors }, Some(syntax))
 }
 
 #[derive(Debug)]
 enum PartiallyCompiled {
     NotCompiled(char),
     Space,
-    CompiledFormula { characters: Vec<char>, colors: Vec<Color> },
-    CompiledObject { characters: Vec<char>, colors: Vec<Color> }
+    CompiledFormula { chars: Vec<char>, colors: Vec<ColorInfo> },
+    CompiledObject { chars: Vec<char>, colors: Vec<ColorInfo> }
 }
 
-fn monochromatic_formula(line: &str, color: Color) -> ColoredString {
-    ColoredString {
-        characters: line.chars().collect(),
+fn monochromatic_formula(line: &str, color: Color, context: LineContext) -> FileLine {
+    let color = ColorInfo::fg_color(color);
+    FileLine {
+        context,
+        chars: line.chars().collect(),
         colors: line.chars().map(|_| color).collect()
     }
 }
 
-pub fn parse_formula<'a>(
-    line: &'a str, lib_data: &LibraryData, additional_syntax: Option<Syntax>
-) -> ColoredString {
+pub fn parse_formula(
+    line: &str, lib_data: &LibraryData, additional_syntax: Option<Syntax>, context: LineContext
+) -> FileLine {
     let leading_spaces_count = line.len() - line.trim_start().len();
     let trailing_spaces_count = line.len() - line.trim_end().len();
     let try_parsing = line.trim().chars()
@@ -88,17 +101,17 @@ pub fn parse_formula<'a>(
             '…' => Err(()),
             ' ' => Ok(PartiallyCompiled::Space),
             c @ '𝑎'..='𝑧' => Ok(PartiallyCompiled::CompiledObject {
-                characters: vec![ c ], colors: vec![ Color::Red ]
+                chars: vec![ c ], colors: vec![ OBJ_VAR_COLOR ]
             }),
             c @ '𝛼'..='𝜔' => Ok(PartiallyCompiled::CompiledFormula {
-                characters: vec![ c ], colors: vec![ Color::Blue ]
+                chars: vec![ c ], colors: vec![ WFF_VAR_COLOR ]
             }),
             c => Ok(PartiallyCompiled::NotCompiled(c))
         })
         .collect::<Result<Vec<_>, _>>();
     let mut partially_compiled = match try_parsing {
         Ok(list) => list,
-        Err(()) => return monochromatic_formula(line, Color::Red)
+        Err(()) => return monochromatic_formula(line, Color::Red, context)
     };
     let syntaxes = additional_syntax.iter()
         .chain(lib_data.syntaxes.iter())
@@ -115,26 +128,26 @@ pub fn parse_formula<'a>(
                 let syntax_color = match (
                     &syntax.syntax_type, syntax.distinct_wff_count, syntax.distinct_object_count
                 ) {
-                    (_, _, _) if syntax_id == 0 && additional_syntax.is_some() => Color::White,
-                    (SyntaxType::Formula, 0, 0) => Color::Green,
-                    (SyntaxType::Formula, _, _) => Color::Cyan,
-                    (SyntaxType::Object, 0, 0) => Color::Yellow,
-                    (SyntaxType::Object, _, _) => Color::Magenta
+                    (_, _, _) if syntax_id == 0 && additional_syntax.is_some() => NEW_SYNTAX_COLOR,
+                    (SyntaxType::Formula, 0, 0) => WFF_SINGLETON_COLOR,
+                    (SyntaxType::Formula, _, _) => WFF_SYNTAX_COLOR,
+                    (SyntaxType::Object, 0, 0) => OBJ_SINGLETON_COLOR,
+                    (SyntaxType::Object, _, _) => OBJ_SYNTAX_COLOR
                 };
 
                 let mut wffs = vec![None; syntax.distinct_wff_count];
                 let mut objects = vec![None; syntax.distinct_object_count];
                 
                 let mut i = index;
-                let mut characters = Vec::new();
+                let mut chars = Vec::new();
                 let mut colors = Vec::new();
                 let mut syntax_length = 0;
                 for pl in &syntax.formula {
                     let c = loop {
                         match partially_compiled.get(i) {
                             Some(PartiallyCompiled::Space) => {
-                                characters.push(' ');
-                                colors.push(Color::Normal);
+                                chars.push(' ');
+                                colors.push(ColorInfo::NO_COLOR);
                                 syntax_length += 1;
                                 i += 1;
                             },
@@ -147,18 +160,18 @@ pub fn parse_formula<'a>(
                             PartiallyCompiled::NotCompiled(c1),
                             Placeholder::LiteralChar(c2)
                         ) => {
-                            characters.push(*c1);
+                            chars.push(*c1);
                             colors.push(syntax_color);
                             syntax_length += 1;
                             c1 == c2
                         },
                         (
                             PartiallyCompiled::CompiledFormula {
-                                characters: chs, colors: cols
+                                chars: chs, colors: cols
                             },
                             Placeholder::WellFormedFormula(id)
                         ) => {
-                            characters.extend(chs);
+                            chars.extend(chs);
                             colors.extend(cols);
                             syntax_length += 1;
                             match &wffs[*id] {
@@ -168,11 +181,11 @@ pub fn parse_formula<'a>(
                         },
                         (
                             PartiallyCompiled::CompiledObject {
-                                characters: chs, colors: cols
+                                chars: chs, colors: cols
                             },
                             Placeholder::Object(id)
                         ) => {
-                            characters.extend(chs);
+                            chars.extend(chs);
                             colors.extend(cols);
                             syntax_length += 1;
                             match &objects[*id] {
@@ -193,10 +206,10 @@ pub fn parse_formula<'a>(
                 };
                 let element_to_insert = match syntax.syntax_type {
                     SyntaxType::Formula => PartiallyCompiled::CompiledFormula {
-                        characters, colors
+                        chars, colors
                     },
                     SyntaxType::Object => PartiallyCompiled::CompiledObject {
-                        characters, colors
+                        chars, colors
                     }
                 };
                 partially_compiled.insert(index, element_to_insert);
@@ -205,22 +218,23 @@ pub fn parse_formula<'a>(
             };
         };
         // We only can get here if no syntax has matched
-        return monochromatic_formula(line, Color::Red);
+        return monochromatic_formula(line, Color::Red, context);
     };
 
     match partially_compiled.pop() {
         Some(
-            PartiallyCompiled::CompiledFormula { characters, colors }
-        ) => ColoredString {
-            characters: vec![' '; leading_spaces_count].into_iter()
-                .chain(characters)
+            PartiallyCompiled::CompiledFormula { chars, colors }
+        ) => FileLine {
+            context,
+            chars: vec![' '; leading_spaces_count].into_iter()
+                .chain(chars)
                 .chain(vec![' '; trailing_spaces_count])
                 .collect(),
-            colors: vec![Color::Normal; leading_spaces_count].into_iter()
+            colors: vec![ColorInfo::NO_COLOR; leading_spaces_count].into_iter()
             .chain(colors)
-            .chain(vec![Color::Normal; trailing_spaces_count])
+            .chain(vec![ColorInfo::NO_COLOR; trailing_spaces_count])
             .collect()
         },
-        _ => monochromatic_formula(line, Color::Red)
+        _ => monochromatic_formula(line, Color::Red, context)
     }
 }

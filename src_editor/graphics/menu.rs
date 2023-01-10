@@ -2,6 +2,7 @@ use std::{fs, path::Path};
 
 pub struct MenuGraphics {
     pub cursor: usize,
+    pub camera: usize,
     pub lines: Vec<MenuLine>
 }
 
@@ -94,6 +95,7 @@ pub fn get_menu() -> Result<MenuGraphics, ()> {
     Ok(
         MenuGraphics {
             cursor: 2,
+            camera: 1,
             lines: result_lines
         }
     )

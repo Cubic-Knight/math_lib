@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::iter::repeat;
 use super::{
-    FileLine, ProvenState,
+    FileLine, LineContext,
+    ColorInfo, Color,
     parse_new_syntax,
     parse_formula
 };
-use crate::graphics::IndentInfo;
 use crate::library_data::{
     LibraryData, Reference,
     Syntax, SyntaxType
@@ -14,27 +15,27 @@ pub fn parse_syntax_section(section: Vec<&str>, syntax_type: SyntaxType) -> (Vec
     let mut lines = section.into_iter();
 
     let section_name_line = match lines.next() {
-        Some(section_name) => FileLine::Section {
-            name: section_name.to_owned(),
-            is_valid: section_name == "# Syntax"
+        Some(section_name) => {
+            let name_color = match section_name == "# Syntax" {
+                true => ColorInfo::fg_color(Color::White).bold_underlined(),
+                false => ColorInfo::fg_color(Color::Red)
+            };
+            let chars = section_name.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| name_color).collect();
+            FileLine { context: LineContext::Section, chars, colors }
         },
         None => return (vec![], None)
     };
-    let (syntax, syntax_line) = match lines.next() {
-        Some(line) => {
-            let (colored_string, syntax) = parse_new_syntax(line, syntax_type);
-            let assertion = FileLine::Assertion {
-                assertion: colored_string,
-                is_proven: ProvenState::None
-            };
-            (syntax, assertion)
-        },
+    let (syntax_def_line, syntax) = match lines.next() {
+        Some(line) => parse_new_syntax(line, syntax_type),
         None => return (vec![ section_name_line ], None)
     };
     
-    let mut result_lines = vec![ section_name_line, syntax_line ];
+    let mut result_lines = vec![ section_name_line, syntax_def_line ];
     for line in lines {
-        result_lines.push( FileLine::UnexpectedLine(line.to_owned()) );
+        let chars = line.chars().collect::<Vec<_>>();
+        let colors = chars.iter().map(|_| ColorInfo::fg_color(Color::Red)).collect();
+        result_lines.push( FileLine { context: LineContext::UnexpectedLine, chars, colors } );
     };
     (result_lines, syntax)
 }
@@ -45,137 +46,280 @@ pub fn parse_definition_section(
     let mut lines = section.into_iter();
 
     let section_name_line = match lines.next() {
-        Some(section_name) => FileLine::Section {
-            name: section_name.to_owned(),
-            is_valid: section_name == "# Definition"
+        Some(section_name) => {
+            let name_color = match section_name == "# Definition" {
+                true => ColorInfo::fg_color(Color::White).bold_underlined(),
+                false => ColorInfo::fg_color(Color::Red)
+            };
+            let chars = section_name.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| name_color).collect();
+            FileLine { context: LineContext::Section, chars, colors }
         },
         None => return vec![]
     };
     let definition_line = match lines.next() {
         Some(line) => {
-            let colored_string = parse_formula(line, lib_data, new_syntax);
-            let assertion = FileLine::Assertion {
-                assertion: colored_string,
-                is_proven: ProvenState::None
-            };
-            assertion
+            let context = LineContext::AssumedAssertion;
+            parse_formula(line, lib_data, new_syntax, context)
         },
         None => return vec![ section_name_line ]
     };
     
     let mut result_lines = vec![ section_name_line, definition_line ];
     for line in lines {
-        result_lines.push( FileLine::UnexpectedLine(line.to_owned()) );
+        let chars = line.chars().collect::<Vec<_>>();
+        let colors = chars.iter().map(|_| ColorInfo::fg_color(Color::Red)).collect();
+        result_lines.push( FileLine { context: LineContext::UnexpectedLine, chars, colors } );
     };
     result_lines
 }
 
-pub fn parse_hypotesis_section(section: Vec<&str>, lib_data: &LibraryData) -> Vec<FileLine> {
+pub fn parse_hypotesis_section(
+    section: Vec<&str>, lib_data: &LibraryData
+) -> (Vec<FileLine>, Vec<String>) {
     let mut lines = section.into_iter();
 
     let section_name_line = match lines.next() {
-        Some(section_name) => FileLine::Section {
-            name: section_name.to_owned(),
-            is_valid: section_name == "# Hypothesis" || section_name == "# Hypotheses"
+        Some(section_name) => {
+            let is_valid = section_name == "# Hypothesis" || section_name == "# Hypotheses";
+            let name_color = match is_valid {
+                true => ColorInfo::fg_color(Color::White).bold_underlined(),
+                false => ColorInfo::fg_color(Color::Red)
+            };
+            let chars = section_name.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| name_color).collect();
+            FileLine { context: LineContext::Section, chars, colors }
         },
-        None => return vec![]
+        None => return (vec![], vec![])
     };
 
     let mut result_lines = vec![ section_name_line ];
+    let mut hypot_names = Vec::new();
     for line in lines {
         let hypothesis = match line.split_once(':') {
-            Some((name, hypot)) => FileLine::Hypothesis {
-                name: name.to_owned(),
-                hypot: parse_formula(hypot, lib_data, None)
+            Some((name, hypot)) => {
+                hypot_names.push(name.to_owned());
+                let context = LineContext::Hypothesis;
+                let FileLine {
+                    context: _, chars: hyp_chars, colors: hyp_colors
+                } = parse_formula(hypot, lib_data, None, context);
+                let chars = name.chars()
+                    .chain(Some(':'))
+                    .chain(hyp_chars)
+                    .collect();
+                let colors = name.chars()
+                    .map(|_| ColorInfo::NO_COLOR)
+                    .chain(Some(ColorInfo::NO_COLOR))
+                    .chain(hyp_colors)
+                    .collect();
+                FileLine { context, chars, colors }
             },
-            None => FileLine::UnexpectedLine(line.to_owned()) 
+            None => {
+                let chars = line.chars().collect::<Vec<_>>();
+                let colors = chars.iter().map(
+                    |_| ColorInfo::fg_color(Color::Red)
+                ).collect();
+                FileLine { context: LineContext::UnexpectedLine, chars, colors }
+            }
         };
         result_lines.push( hypothesis );
     };
-    result_lines
+    (result_lines, hypot_names)
 }
 
-pub fn parse_assertion_section(section: Vec<&str>, lib_data: &LibraryData) -> Vec<FileLine> {
+pub fn parse_assertion_section(
+    section: Vec<&str>, lib_data: &LibraryData, context: LineContext
+) -> Vec<FileLine> {
     let mut lines = section.into_iter();
 
     let section_name_line = match lines.next() {
-        Some(section_name) => FileLine::Section {
-            name: section_name.to_owned(),
-            is_valid: section_name == "# Assertion" || section_name == "# Assertions"
+        Some(section_name) => {
+            let is_valid = match (context, section_name) {
+                (LineContext::AxiomHypothesis, "# Hypothesis") => true,
+                (LineContext::AxiomHypothesis, "# Hypotheses") => true,
+                (_, "# Assertion") => true,
+                (_, "# Assertions") => true,
+                _ => false
+            };
+            let name_color = match is_valid {
+                true => ColorInfo::fg_color(Color::White).bold_underlined(),
+                false => ColorInfo::fg_color(Color::Red)
+            };
+            let chars = section_name.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| name_color).collect();
+            FileLine { context: LineContext::Section, chars, colors }
         },
         None => return vec![]
     };
 
     let mut result_lines = vec![ section_name_line ];
     for line in lines {
-        let assertion = FileLine::Assertion {
-            assertion: parse_formula(line, lib_data, None),
-            is_proven: ProvenState::NotProven
-        };
+        let assertion = parse_formula(line, lib_data, None, context);
         result_lines.push( assertion );
     };
     result_lines
 }
 
-pub fn parse_proof_section(
-    section: Vec<&str>, lib_data: &LibraryData, references: &HashMap<String, Reference>
-) -> (Vec<FileLine>, IndentInfo) {
-    let mut indent_info = IndentInfo {
-        line_number_indent: 4,
-        used_hypotheses_indent: 2,
-        theorem_reference_indent: 2
-    };
 
+fn parse_used_hypots(used_hypots: &str, line_no: &str) -> Vec<(char, ColorInfo)> {
+    let line_num = match line_no.parse::<usize>() {
+        Ok(n) => n,
+        Err(_) => {
+            return used_hypots.chars()
+                .map(|c| (c, ColorInfo::NO_COLOR))
+                .collect::<Vec<_>>()
+        }
+    };
+    used_hypots.split(',')
+        .map(|s| {
+            let leading_spaces = s.len() - s.trim_start().len();
+            let trailing_spaces = s.len() - s.trim_end().len();
+            let color = match s.trim().parse::<usize>() {
+                Ok(n) if n < line_num => ColorInfo::NO_COLOR,
+                _ => ColorInfo::fg_color(Color::Red)
+            };
+            Some((',', ColorInfo::NO_COLOR)).into_iter()
+                .chain(
+                    repeat((' ', ColorInfo::NO_COLOR)).take(leading_spaces)
+                ).chain(
+                    s.trim().chars().zip( repeat(color) )
+                ).chain(
+                    repeat((' ', ColorInfo::NO_COLOR)).take(trailing_spaces)
+                )
+        }).flatten()
+        .skip(1)  // Skip the first comma
+        .collect::<Vec<_>>()
+}
+
+fn theo_is_valid(
+    theo_ref: &str, hypot_names: &Vec<String>,
+    lib_data: &LibraryData, references: &HashMap<String, Reference>
+) -> bool {
+    if hypot_names.contains(&theo_ref.to_owned()) {
+        return true;
+    };
+    let (name, sub_id) = match theo_ref.split_once('.') {
+        Some((name, num)) => {
+            let Ok(sub_id) = num.parse::<usize>() else {
+                return false;
+            };
+            (name, sub_id)
+        },
+        None => (theo_ref, 1)
+    };
+    if sub_id == 0 { return false; }
+    match references.get(name) {
+        Some(Reference::DefinitionReference(_)) => sub_id == 1,
+        Some(Reference::AxiomReference(id, _)) => {
+            sub_id <= lib_data.axioms[*id].assertions.len()
+        },
+        Some(Reference::TheoremReference(id, _)) => {
+            sub_id <= lib_data.theorems[*id].assertions.len()
+        },
+        _ => false
+    }
+}
+
+pub fn parse_proof_section(
+    section: Vec<&str>, lib_data: &LibraryData,
+    references: &HashMap<String, Reference>, hypot_names: Vec<String>
+) -> Vec<FileLine> {
     let mut lines = section.into_iter();
 
     let section_name_line = match lines.next() {
-        Some(section_name) => FileLine::Section {
-            name: section_name.to_owned(),
-            is_valid: section_name == "# Proof"
+        Some(section_name) => {
+            let name_color = match section_name == "# Proof" {
+                true => ColorInfo::fg_color(Color::White).bold_underlined(),
+                false => ColorInfo::fg_color(Color::Red)
+            };
+            let chars = section_name.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| name_color).collect();
+            FileLine { context: LineContext::Section, chars, colors }
         },
-        None => return (vec![], indent_info)
+        None => return vec![]
     };
 
-    let mut result_lines = vec![ section_name_line ];
+    let mut max_line_no_len = 2;
+    let mut max_used_hypots_len = 2;
+    let mut max_theo_ref_len = 2;
+    let mut preparsed_lines = Vec::new();
     for (i, line) in lines.enumerate() {
         let mut parts = line.splitn(4, ';')
             .map(|s| s.trim());
-        let line_no = parts.next().unwrap_or("").to_owned();
-        if line_no.len() > indent_info.line_number_indent {
-            indent_info.line_number_indent = match line_no.len() % 4 {
-                0 => line_no.len(),
-                r => line_no.len() + (4 - r)
-            };
+        let line_no = parts.next().unwrap_or("");
+        let line_no_color = match line_no.parse::<usize>() == Ok(i+1) {
+            true => ColorInfo::NO_COLOR,
+            false => ColorInfo::fg_color(Color::Red)
         };
-        let used_hypots = parts.next().unwrap_or("")
-            .split(',').map(|s| s.trim().to_owned())
-            .collect::<Vec<_>>();
-        let used_hypots_len = used_hypots.iter()
-            .map(|s| s.len())
-            .sum::<usize>() + 2 * (used_hypots.len() - 1);
-        if used_hypots_len > indent_info.used_hypotheses_indent {
-            indent_info.used_hypotheses_indent = match (used_hypots_len - 2) % 4 {
-                0 => used_hypots_len,
-                r => used_hypots_len + (4 - r)
-            };
-        };
-        let theo_ref = parts.next().unwrap_or("").to_owned();
-        if theo_ref.len() > indent_info.theorem_reference_indent {
-            indent_info.theorem_reference_indent = match (theo_ref.len() - 2) % 4 {
-                0 => theo_ref.len(),
-                r => theo_ref.len() + (4 - r)
-            };
-        };
-        let resulting_formula = parts.next().unwrap_or("");
+        let line_no_len = line_no.chars().count();
+        if line_no_len > max_line_no_len { max_line_no_len = line_no_len; };
 
-        let proof_line = FileLine::ProofLine {
-            line_no, line_index: i+1,
-            used_hypots,
-            theo_ref_exists: references.contains_key(&theo_ref),
-            theo_ref,
-            formula: parse_formula(resulting_formula, lib_data, None)
+        let used_hypots = parts.next().unwrap_or("");
+        let used_hypots_color = parse_used_hypots(used_hypots, line_no);
+        let used_hypots_len = used_hypots.chars().count();
+        if used_hypots_len > max_used_hypots_len { max_used_hypots_len = used_hypots_len; };
+
+        let theo_ref = parts.next().unwrap_or("").to_owned();
+        let theo_valid = theo_is_valid(&theo_ref, &hypot_names, lib_data, references);
+        let theo_ref_color = match theo_valid {
+            true => ColorInfo::NO_COLOR,
+            false => ColorInfo::fg_color(Color::Red)
         };
-        result_lines.push( proof_line );
+        let theo_ref_len = theo_ref.chars().count();
+        if theo_ref_len > max_theo_ref_len { max_theo_ref_len = theo_ref_len; };
+
+        let context = LineContext::ProofLine;
+        let resulting_formula = parse_formula(
+            parts.next().unwrap_or(""), lib_data, None, context
+        );
+
+        preparsed_lines.push((
+            (line_no, line_no_color),
+            used_hypots_color,
+            (theo_ref, theo_ref_color),
+            resulting_formula
+        ));
     };
-    (result_lines, indent_info)
+    let mut result_lines = vec![ section_name_line ];
+    for line in preparsed_lines {
+        let (
+            (line_no, line_no_color),
+            used_hypots_color,
+            (theo_ref, theo_ref_color),
+            FileLine {
+                context,
+                chars: mut formula_chars,
+                colors: mut formula_colors
+            }
+        ) = line;
+
+        let mut chars = Vec::new();
+        let mut colors = Vec::new();
+        for c in line_no.chars().chain( repeat(' ') ).take(max_line_no_len) {
+            chars.push(c);
+            colors.push(line_no_color);
+        };
+        chars.extend_from_slice( &[' ', ';', ' '] );
+        colors.extend_from_slice( &[ColorInfo::NO_COLOR; 3] );
+        let used_hypots_color_iter = used_hypots_color.into_iter()
+            .chain( repeat((' ', ColorInfo::NO_COLOR)) )
+            .take(max_used_hypots_len);
+        for (c, col) in used_hypots_color_iter {
+            chars.push(c);
+            colors.push(col);
+        };
+        chars.extend_from_slice( &[' ', ';', ' '] );
+        colors.extend_from_slice( &[ColorInfo::NO_COLOR; 3] );
+        for c in theo_ref.chars().chain( repeat(' ') ).take(max_theo_ref_len) {
+            chars.push(c);
+            colors.push(theo_ref_color);
+        };
+        chars.extend_from_slice( &[' ', ';', ' '] );
+        colors.extend_from_slice( &[ColorInfo::NO_COLOR; 3] );
+        chars.append( &mut formula_chars );
+        colors.append( &mut formula_colors );
+
+        result_lines.push( FileLine { context, chars, colors } )
+    };
+    result_lines
 }

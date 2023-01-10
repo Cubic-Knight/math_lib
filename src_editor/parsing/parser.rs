@@ -4,46 +4,74 @@ use std::{
 };
 
 use super::{
-    FileLine, FileType,
+    FileLine, LineContext, FileType,
+    ColorInfo, Color,
     parse_syntax_section,
     parse_definition_section,
     parse_hypotesis_section,
     parse_assertion_section,
     parse_proof_section
 };
-use crate::graphics::IndentInfo;
 use crate::library_data::{
     LibraryData, Reference, SyntaxType
 };
 
 pub fn parse_title(lines: &mut std::str::Lines) -> (FileLine, FileType) {
     let first_line = match lines.next() {
-        None => return (FileLine::Raw("".to_string()), FileType::Unknown),
+        None => return (
+            FileLine { context: LineContext::Raw, chars: vec![], colors: vec![] },
+            FileType::Unknown
+        ),
         Some(line) => line
     };
     if !first_line.starts_with("##") {
-        return (FileLine::Raw(first_line.to_string()), FileType::Unknown);
+        let chars = first_line.chars().collect::<Vec<_>>();
+        let colors = chars.iter().map(|_| ColorInfo::NO_COLOR).collect();
+        return (
+            FileLine { context: LineContext::Raw, chars, colors },
+            FileType::Unknown
+        );
     }
     let (title, name) = match first_line.rsplit_once(' ') {
-        None => return (FileLine::Raw(first_line.to_string()), FileType::Unknown),
+        None => {
+            let chars = first_line.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| ColorInfo::NO_COLOR).collect();
+            return (
+                FileLine { context: LineContext::Raw, chars, colors },
+                FileType::Unknown
+            );
+        },
         Some((title, name)) => (title, name)
     };
-    let (title_good, file_type) = match title {
-        "## Syntax Definition (formula)" => (true, FileType::SyntaxDefinitionFormula),
-        "## Syntax Definition (object)" => (true, FileType::SyntaxDefinitionObject),
-        "## Axiom" => (true, FileType::Axiom),
-        "## Theorem" => (true, FileType::Theorem),
-        _ => (false, FileType::Unknown)
+    let (title_bg_color, file_type) = match title {
+        "## Syntax Definition (formula)" => (Color::Blue, FileType::SyntaxDefinitionFormula),
+        "## Syntax Definition (object)" => (Color::Blue, FileType::SyntaxDefinitionObject),
+        "## Axiom" => (Color::Blue, FileType::Axiom),
+        "## Theorem" => (Color::Blue, FileType::Theorem),
+        _ => (Color::Red, FileType::Unknown)
     };
-    let name_good = name.chars().all(|c| c.is_ascii_alphanumeric());
-    let title = title.to_owned();
-    let name = name.to_owned();
-    ( FileLine::Title { title, name, title_good, name_good }, file_type )
+    let name_color = match name.chars().all(|c| c.is_ascii_alphanumeric()) {
+        true => ColorInfo::fg_bg_color(Color::Black, Color::Cyan).underlined(),
+        false => ColorInfo::fg_bg_color(Color::Black, Color::Red).underlined()
+    };
+    let chars = title.chars()
+        .chain(Some(' '))
+        .chain(name.chars())
+        .collect();
+    let colors = title.chars().chain(Some(' '))
+        .map(|_| ColorInfo::fg_bg_color(Color::Black, title_bg_color).underlined())
+        .chain( name.chars().map(|_| name_color) )
+        .collect();
+
+    (
+        FileLine { context: LineContext::Title, chars, colors },
+        file_type
+    )
 }
 
 pub fn parse_file(
     path: String, lib_data: &LibraryData, references: &HashMap<String, Reference>
-) -> io::Result<(Vec<FileLine>, IndentInfo)> {
+) -> io::Result<Vec<FileLine>> {
     let contents = fs::read_to_string(path)?;
     let mut lines = contents.lines();
 
@@ -61,21 +89,18 @@ pub fn parse_file(
     sections.push(temp);
     let mut sections = sections.into_iter();
 
-    let mut indent_info = IndentInfo {
-        line_number_indent: 0,
-        used_hypotheses_indent: 0,
-        theorem_reference_indent: 0
-    };
     let mut result_lines = vec![ title ];
     if let Some(empty_first_section) = sections.next() {
         for line in empty_first_section {
-            result_lines.push( FileLine::Raw(line.to_owned()) );
+            let chars = line.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| ColorInfo::NO_COLOR).collect();
+            result_lines.push( FileLine { context: LineContext::Raw, chars, colors } );
         };
     };
     match file_type {
         FileType::SyntaxDefinitionFormula => {
             let Some(syntax_section) = sections.next() else {
-                return Ok((result_lines, indent_info));
+                return Ok(result_lines);
             };
             let (
                 mut syntax_lines, new_syntax
@@ -89,7 +114,7 @@ pub fn parse_file(
         },
         FileType::SyntaxDefinitionObject => {
             let Some(syntax_section) = sections.next() else {
-                return Ok((result_lines, indent_info));
+                return Ok(result_lines);
             };
             let (
                 mut syntax_lines, new_syntax
@@ -103,50 +128,57 @@ pub fn parse_file(
         },
         FileType::Axiom => {
             if let Some(hypothesis_section) = sections.next() {
+                let context = LineContext::AxiomHypothesis;
                 result_lines.append(
                     // Hypotheses are not named in Axioms,
                     // So they are parsed as if they were assertions
-                    &mut parse_assertion_section(hypothesis_section, lib_data)
+                    &mut parse_assertion_section(hypothesis_section, lib_data, context)
                 );
             };
             if let Some(assertion_section) = sections.next() {
+                let context = LineContext::AssumedAssertion;
                 result_lines.append(
-                    &mut parse_assertion_section(assertion_section, lib_data)
+                    &mut parse_assertion_section(assertion_section, lib_data, context)
                 );
             };
         },
         FileType::Theorem => {
-            if let Some(hypothesis_section) = sections.next() {
-                result_lines.append(
-                    &mut parse_hypotesis_section(hypothesis_section, lib_data)
-                );
+            let Some(hypothesis_section) = sections.next() else {
+                return Ok(result_lines);
             };
+            let (
+                mut hypot_lines, hypot_names
+            ) = parse_hypotesis_section(hypothesis_section, lib_data);
+            result_lines.append( &mut hypot_lines );
             if let Some(assertion_section) = sections.next() {
+                let context = LineContext::UnprovenAssertion;
                 result_lines.append(
-                    &mut parse_assertion_section(assertion_section, lib_data)
+                    &mut parse_assertion_section(assertion_section, lib_data, context)
                 );
             };
             if let Some(proof_section) = sections.next() {
-                let (
-                    mut proof_lines, indents
-                ) = parse_proof_section(proof_section, lib_data, references);
-                indent_info = indents;
-                result_lines.append( &mut proof_lines );
+                result_lines.append(
+                    &mut parse_proof_section(proof_section, lib_data, references, hypot_names)
+                );
             };
         },
         FileType::Unknown => {
             for lines in sections.by_ref() {
                 for line in lines {
-                    result_lines.push( FileLine::Raw(line.to_owned()) );
+                    let chars = line.chars().collect::<Vec<_>>();
+                    let colors = chars.iter().map(|_| ColorInfo::NO_COLOR).collect();
+                    result_lines.push( FileLine { context: LineContext::Raw, chars, colors } );
                 };
             };
         }
     }
     for lines in sections {
         for line in lines {
-            result_lines.push( FileLine::UnexpectedLine(line.to_owned()) );
+            let chars = line.chars().collect::<Vec<_>>();
+            let colors = chars.iter().map(|_| ColorInfo::fg_color(Color::Red)).collect();
+            result_lines.push( FileLine { context: LineContext::UnexpectedLine, chars, colors } );
         };
     };
 
-    Ok((result_lines, indent_info))
+    Ok(result_lines)
 }
